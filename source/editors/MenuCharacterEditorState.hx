@@ -24,7 +24,6 @@ import MenuCharacter;
 import openfl.net.FileReference;
 import openfl.events.Event;
 import openfl.events.IOErrorEvent;
-import openfl.utils.Assets;
 import flash.net.FileFilter;
 import haxe.Json;
 #if sys
@@ -164,6 +163,7 @@ class MenuCharacterEditorState extends MusicBeatState
 	var imageInputText:FlxUIInputText;
 	var idleInputText:FlxUIInputText;
 	var confirmInputText:FlxUIInputText;
+	var confirmDescText:FlxText;
 	var scaleStepper:FlxUINumericStepper;
 	var flipXCheckbox:FlxUICheckBox;
 	function addCharacterUI() {
@@ -190,7 +190,7 @@ class MenuCharacterEditorState extends MusicBeatState
 		
 		scaleStepper = new FlxUINumericStepper(140, imageInputText.y, 0.05, 1, 0.1, 30, 2);
 
-		var confirmDescText = new FlxText(10, confirmInputText.y - 18, 0, 'Start Press animation on the .XML:');
+		confirmDescText = new FlxText(10, confirmInputText.y - 18, 0, 'Start Press animation on the .XML:');
 		tab_group.add(new FlxText(10, imageInputText.y - 18, 0, 'Image file name:'));
 		tab_group.add(new FlxText(10, idleInputText.y - 18, 0, 'Idle animation on the .XML:'));
 		tab_group.add(new FlxText(scaleStepper.x, scaleStepper.y - 18, 0, 'Scale:'));
@@ -243,6 +243,9 @@ class MenuCharacterEditorState extends MusicBeatState
 		char.scale.set(characterFile.scale, characterFile.scale);
 		char.updateHitbox();
 		char.animation.play('idle');
+
+		confirmDescText.visible = (curTypeSelected == 1);
+		confirmInputText.visible = (curTypeSelected == 1);
 		updateOffset();
 		
 		#if desktop
@@ -288,7 +291,7 @@ class MenuCharacterEditorState extends MusicBeatState
 			FlxG.sound.volumeUpKeys = TitleState.volumeUpKeys;
 			if(FlxG.keys.justPressed.ESCAPE) {
 				MusicBeatState.switchState(new editors.MasterEditorMenu());
-				FlxG.sound.playMusic(Paths.music('freakyMenu'));
+				FlxG.sound.playMusic(Paths.music('funkinAVI/menu/MenuMusic'));
 			}
 
 			var shiftMult:Int = 1;
@@ -352,7 +355,7 @@ class MenuCharacterEditorState extends MusicBeatState
 		if(_file.__path != null) fullPath = _file.__path;
 
 		if(fullPath != null) {
-			var rawJson:String = Assets.getText(fullPath);
+			var rawJson:String = File.getContent(fullPath);
 			if(rawJson != null) {
 				var loadedChar:MenuCharacterFile = cast Json.parse(rawJson);
 				if(loadedChar.idle_anim != null && loadedChar.confirm_anim != null) //Make sure it's really a character

@@ -1,5 +1,7 @@
 package;
 
+import GameJolt;
+import GameJolt.GameJoltAPI;
 import flixel.graphics.FlxGraphic;
 import flixel.FlxG;
 import flixel.FlxGame;
@@ -10,43 +12,36 @@ import openfl.display.FPS;
 import openfl.display.Sprite;
 import openfl.events.Event;
 import openfl.display.StageScaleMode;
-import lime.system.System;
-import lime.app.Application;
-
-#if desktop
-import Discord.DiscordClient;
-#end
-
+import flixel.tweens.FlxTween;
+import flixel.util.FlxColor;
+import flixel.util.FlxTimer;
 //crash handler stuff
-#if CRASH_HANDLER
+#if Goofy_Ahh_Crash_Thing
+import lime.app.Application;
 import openfl.events.UncaughtErrorEvent;
 import haxe.CallStack;
 import haxe.io.Path;
+import Discord.DiscordClient;
 import sys.FileSystem;
-import openfl.utils.Assets as OpenFlAssets;
 import sys.io.File;
 import sys.io.Process;
 #end
 
-using StringTools;
-
 class Main extends Sprite
 {
-	var game = {
-		width: 1280, // WINDOW width
-		height: 720, // WINDOW height
-		initialState: TitleState, // initial game state
-		zoom: -1.0, // game state bounds
-		framerate: 60, // default framerate
-		skipSplash: true, // if the default flixel splash screen should be skipped
-		startFullscreen: false // if the game should start at fullscreen mode
-	};
-
+	var gameWidth:Int = 1280; // Width of the game in pixels (might be less / more in actual pixels depending on your zoom).
+	var gameHeight:Int = 720; // Height of the game in pixels (might be less / more in actual pixels depending on your zoom).
+	var initialState:Class<FlxState> = MainLoad; // The FlxState the game starts with.
+	var zoom:Float = -1; // If -1, zoom is automatically calculated to fit the window dimensions.
+	var framerate:Int = 60; // Wowwowoowowowowowowowowowowowowowowowow wtf dude, start with at least 120 FPS
+	var skipSplash:Bool = true; // Hope we add this to the mod xd
+	var startFullscreen:Bool = false; // N o
+	public static var gjToastManager:GJToastManager; //Toast For Advice
 	public static var fpsVar:FPS;
 
+	public static var focusMusicTween:FlxTween;
+
 	// You can pretty much ignore everything from here on - your code should go in your states.
-	
-	public static var path:String = System.applicationStorageDirectory;
 
 	public static function main():Void
 	{
@@ -79,21 +74,33 @@ class Main extends Sprite
 
 	private function setupGame():Void
 	{
+		gjToastManager = new GJToastManager();
+		addChild(gjToastManager); //adding the toddler
+		
 		var stageWidth:Int = Lib.current.stage.stageWidth;
 		var stageHeight:Int = Lib.current.stage.stageHeight;
 
-		if (game.zoom == -1.0)
+		var res = ClientPrefs.screenRes.split('x');
+		gameWidth = Std.parseInt(res[0]);
+		gameHeight = Std.parseInt(res[1]);
+
+		if (zoom == -1)
 		{
-			var ratioX:Float = stageWidth / game.width;
-			var ratioY:Float = stageHeight / game.height;
-			game.zoom = Math.min(ratioX, ratioY);
-			game.width = Math.ceil(stageWidth / game.zoom);
-			game.height = Math.ceil(stageHeight / game.zoom);
+			var ratioX:Float = stageWidth / gameWidth;
+			var ratioY:Float = stageHeight / gameHeight;
+			zoom = Math.min(ratioX, ratioY);
+			gameWidth = Math.ceil(stageWidth / zoom);
+			gameHeight = Math.ceil(stageHeight / zoom);
 		}
+
+		#if !debug
+		initialState = MainLoad;
+		#end
 	
 		ClientPrefs.loadDefaultKeys();
-		addChild(new FlxGame(game.width, game.height, game.initialState, #if (flixel < "5.0.0") game.zoom, #end game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
+		addChild(new FlxGame(gameWidth, gameHeight, initialState, zoom, framerate, framerate, skipSplash, startFullscreen));
 
+		#if !mobile
 		fpsVar = new FPS(10, 3, 0xFFFFFF);
 		addChild(fpsVar);
 		Lib.current.stage.align = "tl";
@@ -101,67 +108,142 @@ class Main extends Sprite
 		if(fpsVar != null) {
 			fpsVar.visible = ClientPrefs.showFPS;
 		}
+		#end
 
-		#if html5
 		FlxG.autoPause = false;
 		FlxG.mouse.visible = false;
-		#end
-		
-		#if CRASH_HANDLER
-		Lib.current.loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onCrash);
-		#end
 
-		#if desktop
-		if (!DiscordClient.isInitialized) {
-			DiscordClient.initialize();
-			Application.current.window.onClose.add(function() {
-				DiscordClient.shutdown();
-			});
-		}
-		#end
+		Application.current.window.fullscreen = false;
+		Application.current.window.onFocusOut.add(onWindowFocusOut);
+		Application.current.window.onFocusIn.add(onWindowFocusIn);
 	}
 
-	// Code was entirely made by sqirra-rng for their fnf engine named "Izzy Engine", big props to them!!!
-	// very cool person for real they don't get enough credit for their work
-	#if CRASH_HANDLER
-	function onCrash(e:UncaughtErrorEvent):Void
-	{
-		var errMsg:String = "";
-		var path:String;
-		var callStack:Array<StackItem> = CallStack.exceptionStack(true);
-		var dateNow:String = Date.now().toString();
+	var game:FlxGame;
+	var oldVol:Float = 1.0;
+	var newVol:Float = 0.3;
 
-		dateNow = dateNow.replace(" ", "_");
-		dateNow = dateNow.replace(":", "'");
+	public static var focused:Bool = true;
 
-		path = Main.path + "./crash/" + "PsychEngine_" + dateNow + ".txt";
-
-		for (stackItem in callStack)
+	// funi Indie Cross volume code
+	function onWindowFocusOut()
 		{
-			switch (stackItem)
+			focused = false;
+	
+			// Lower global volume when unfocused
+			if (Type.getClass(FlxG.state) != PlayState) // imagine stealing my code smh
 			{
-				case FilePos(s, file, line, column):
-					errMsg += file + " (line " + line + ")\n";
-				default:
-					Sys.println(stackItem);
+				oldVol = FlxG.sound.volume;
+				if (oldVol > 0.3)
+				{
+					newVol = 0.3;
+				}
+				else
+				{
+					if (oldVol > 0.1)
+					{
+						newVol = 0.1;
+					}
+					else
+					{
+						newVol = 0;
+					}
+				}
+	
+				trace("Game unfocused");
+	
+				if (focusMusicTween != null)
+					focusMusicTween.cancel();
+				focusMusicTween = FlxTween.tween(FlxG.sound, {volume: newVol}, 0.5);
+	
+				// Conserve power by lowering draw framerate when unfocuced
+				FlxG.drawFramerate = 60;
 			}
 		}
 
-		errMsg += "\nUncaught Error: " + e.error + "\n> Crash Handler written by: sqirra-rng";
+		public function onResize(width:Int, height:Int) { //bro too easy
+			FlxG.resizeWindow(width, height);
+		}
+	
+		function onWindowFocusIn()
+		{
+			new FlxTimer().start(0.2, function(tmr:FlxTimer)
+			{
+				focused = true;
+			});
+	
+			// Lower global volume when unfocused
+			if (Type.getClass(FlxG.state) != PlayState)
+			{
+				trace("Game focused");
+	
+				// Normal global volume when focused
+				if (focusMusicTween != null)
+					focusMusicTween.cancel();
+	
+				focusMusicTween = FlxTween.tween(FlxG.sound, {volume: oldVol}, 0.5);
+	
+				// Bring framerate back when focused
+				FlxG.drawFramerate = 120;
+			}
+		}
 
-		if (!OpenFlAssets.exists("./crash/"))
-			FileSystem.createDirectory(Main.path + "./crash/");
-
-		File.saveContent(path, errMsg + "\n");
-
-		Sys.println(errMsg);
-		Sys.println("Crash dump saved in " + Path.normalize(path));
-
-		Application.current.window.alert(errMsg, "Error!");
-                #if desktop
-		DiscordClient.shutdown();
-                #end
-		Sys.exit(1);
-	}
-	#end
+		/*function onCrash(e:UncaughtErrorEvent):Void
+			{
+				var errMsg:String = "";
+				var path:String;
+				var callStack:Array<StackItem> = CallStack.exceptionStack(true);
+				var dateNow:String = Date.now().toString();
+		
+				dateNow = StringTools.replace(dateNow, " ", "_");
+				dateNow = StringTools.replace(dateNow, ":", "'");
+		
+				path = "./crash/" + "FunkinAVI_" + dateNow + ".txt";
+		
+				errMsg = "Version: " + Lib.application.meta["version"] + "\n";
+		
+				for (stackItem in callStack)
+				{
+					switch (stackItem)
+					{
+						case FilePos(s, file, line, column):
+							errMsg += file + " (line " + line + ")\n";
+						default:
+							Sys.println(stackItem);
+					}
+				}
+		
+				errMsg += "\nUncaught Error: " + e.error + "\nReport the error here: https://discord.gg/cZydhxFYpp";
+		
+				if (!FileSystem.exists("./crash/"))
+					FileSystem.createDirectory("./crash/");
+		
+				File.saveContent(path, errMsg + "\n");
+		
+				Sys.println(errMsg);
+				Sys.println("Crash dump saved in " + Path.normalize(path));
+		
+				var crashDialoguePath:String = "FlixelCrashHandler";
+		
+				#if windows
+				crashDialoguePath += ".exe";
+				#end
+		
+				if (FileSystem.exists("./" + crashDialoguePath))
+				{
+					Sys.println("Found crash dialog: " + crashDialoguePath);
+		
+					#if linux
+					crashDialoguePath = "./" + crashDialoguePath;
+					#end
+					new Process(crashDialoguePath, [path]);
+				}
+				else
+				{
+					Sys.println("No crash dialog found! Making a simple alert instead...");
+					Application.current.window.alert(errMsg, "Error!");
+				}
+		
+				Sys.exit(1);
+			}*/
 }
+	

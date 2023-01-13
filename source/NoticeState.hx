@@ -1,5 +1,6 @@
 package;
 
+import GameJolt.GameJoltAPI;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxSubState;
@@ -15,7 +16,7 @@ import openfl.filters.BitmapFilter;
 import openfl.filters.ShaderFilter;
 import Shaders;
 
-class FlashingState extends MusicBeatState
+class NoticeState extends MusicBeatState
 {
 	public static var leftState:Bool = false;
 
@@ -26,11 +27,13 @@ class FlashingState extends MusicBeatState
 
 	var shaders:Array<ShaderEffect> = [];
 
-	var blackFade:FlxSprite; //copy from DisclaimerState, whatever, it works
 	var warnText:FlxText;
 	override function create()
 	{
 		super.create();
+
+		GameJoltAPI.connect();
+        GameJoltAPI.authDaUser(FlxG.save.data.gjUser, FlxG.save.data.gjToken);
 
 		if(ClientPrefs.funiShaders)
 					{
@@ -58,36 +61,33 @@ class FlashingState extends MusicBeatState
 
 
 					}
-
 	
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		add(bg);
 
 		if(ClientPrefs.language == "English") {
 		warnText = new FlxText(0, 0, FlxG.width,
-			"WARNING:\n
-			This Mod contains some flashing lights,\n
-			disturbing imagery, and disturbing themes of suicide.\n
-			Press ENTER to continue to the game.\n
-			Press ESCAPE to disable flashes now.\n
-			You've been warned!",
+			"NOTICE:\n
+			This Mod contains some higher end graphics,\n
+			thus causing lag or crashing your PC.\n
+			Press ENTER to keep Shaders on.\n
+			Press ESCAPE to Disable them.\n
+			Thank you for playing!",
 			32);
 		} else if(ClientPrefs.language == "Spanish") {
 		warnText = new FlxText(0, 0, FlxG.width,
-			"ADVERTENCIA:\n
-			Este mod contiene algunas luces intermitentes,\n
-			imágenes perturbadoras y temas perturbadores de suicidio.\n
-			Presiona ENTER para continuar con el juego.\n
-			Presiona ESCAPE para deshabilitar los flashes ahora.\n
-			¡Has sido advertido!",
+			"AVISO:\n
+			Este Mod contiene algunos gráficos de gama alta,\n
+			causando así retrasos o fallas en su PC.\n
+			Presiona ENTER para mantener Shaders activados.\n
+			Presiona ESCAPE para deshabilitarlos.\n
+			¡Gracias por jugar!",
 			32);
 		}
+			
 		warnText.setFormat(Paths.font("NewWaltDisneyFontRegular-BPen.ttf"), 32, FlxColor.WHITE, CENTER);
 		warnText.screenCenter(Y);
 		add(warnText);
-		
-		blackFade = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
-		add(blackFade);
 
 		var scratchStuff:FlxSprite = new FlxSprite();
 		scratchStuff.frames = Paths.getSparrowAtlas('funkinAVI-filters/scratchShit');
@@ -106,8 +106,6 @@ class FlashingState extends MusicBeatState
 		grain.scale.x = 1.1;
 		grain.scale.y = 1.1;
 		add(grain);
-		
-		FlxTween.tween(blackFade, {alpha: 0}, 1); //duplicatin' code from Disclaimer since this is BEFORE picking your language now.
 	}
 
 	function addShader(effect:ShaderEffect)
@@ -129,32 +127,28 @@ class FlashingState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
-		if(!leftState) {
 			var back:Bool = controls.BACK;
 			if (controls.ACCEPT || back) {
-				leftState = true;
 				FlxTransitionableState.skipNextTransIn = true;
-				FlxTransitionableState.skipNextTransOut = true;
 				if(!back) {
-					ClientPrefs.flashing = true;
+					ClientPrefs.funiShaders = true;
 					ClientPrefs.saveSettings();
 					FlxG.sound.play(Paths.sound('funkinAVI/menu/select_sfx'));
-					FlxTween.tween(blackFade, {alpha: 1}, 1, {
+					FlxTween.tween(warnText, {alpha: 0}, 1, {
 						onComplete: function (twn:FlxTween) {
-							MusicBeatState.switchState(new DisclaimerState());
-						}
+									MusicBeatState.switchState(new MainMenuState());
+							}
 					});
 				} else {
-					ClientPrefs.flashing = false;
+					ClientPrefs.funiShaders = false;
 					FlxG.sound.play(Paths.sound('funkinAVI/menu/select_sfx'));
-					FlxTween.tween(blackFade, {alpha: 1}, 1, {
+					FlxTween.tween(warnText, {alpha: 0}, 1, {
 						onComplete: function (twn:FlxTween) {
-							MusicBeatState.switchState(new DisclaimerState());
+                            MusicBeatState.switchState(new MainMenuState());
 						}
 					});
 				}
 			}
-		}
 		super.update(elapsed);
 	}
 }

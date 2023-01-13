@@ -4,6 +4,7 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxSubState;
 import flixel.text.FlxText;
+import flixel.FlxSprite;
 import flixel.util.FlxColor;
 import flixel.effects.FlxFlicker;
 import lime.app.Application;
@@ -15,9 +16,9 @@ import openfl.filters.BitmapFilter;
 import openfl.filters.ShaderFilter;
 import Shaders;
 
-class FlashingState extends MusicBeatState
+class LanguageState extends MusicBeatState
 {
-	public static var leftState:Bool = false;
+	public static var languageSelected:Bool = false;
 
 	var bloomShit:WIBloomEffect;
 	var chrom:ChromaticAberrationEffect;
@@ -28,10 +29,16 @@ class FlashingState extends MusicBeatState
 
 	var blackFade:FlxSprite; //copy from DisclaimerState, whatever, it works
 	var warnText:FlxText;
+	var otherText:FlxText;
+	var spanish:FlxSprite;
+	var english:FlxSprite;
 	override function create()
 	{
 		super.create();
 
+        FlxG.mouse.visible = true;
+
+		
 		if(ClientPrefs.funiShaders)
 					{
 						chrom = new ChromaticAberrationEffect();
@@ -58,34 +65,37 @@ class FlashingState extends MusicBeatState
 
 
 					}
-
+        //removed cus value exeption thing, just in case -jsa | I added it back, but it won't work anyways if people turn it off at the shaders warning menu -don
 	
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		add(bg);
 
-		if(ClientPrefs.language == "English") {
 		warnText = new FlxText(0, 0, FlxG.width,
-			"WARNING:\n
-			This Mod contains some flashing lights,\n
-			disturbing imagery, and disturbing themes of suicide.\n
-			Press ENTER to continue to the game.\n
-			Press ESCAPE to disable flashes now.\n
-			You've been warned!",
+		"What Language Do You Talk?/De Que Lenguage hablas?",
 			32);
-		} else if(ClientPrefs.language == "Spanish") {
-		warnText = new FlxText(0, 0, FlxG.width,
-			"ADVERTENCIA:\n
-			Este mod contiene algunas luces intermitentes,\n
-			imágenes perturbadoras y temas perturbadores de suicidio.\n
-			Presiona ENTER para continuar con el juego.\n
-			Presiona ESCAPE para deshabilitar los flashes ahora.\n
-			¡Has sido advertido!",
-			32);
-		}
 		warnText.setFormat(Paths.font("NewWaltDisneyFontRegular-BPen.ttf"), 32, FlxColor.WHITE, CENTER);
-		warnText.screenCenter(Y);
+		warnText.screenCenter(X);
 		add(warnText);
-		
+
+        	otherText = new FlxText(0, 40, FlxG.width,
+            	"(Puede Ser Cambiado En Opciones/it Can be Changed In Options)",
+                32);
+            	otherText.setFormat(Paths.font("NewWaltDisneyFontRegular-BPen.ttf"), 32, FlxColor.WHITE, CENTER);
+            	otherText.screenCenter(X);
+            	add(otherText);
+
+                spanish = new FlxSprite().loadGraphic(Paths.image('language/Spanish'));
+                spanish.screenCenter(Y);
+                spanish.antialiasing = ClientPrefs.globalAntialiasing;
+                spanish.x = 250;
+                add(spanish);
+
+                english = new FlxSprite().loadGraphic(Paths.image('language/English'));
+                english.screenCenter(Y);
+                spanish.antialiasing = ClientPrefs.globalAntialiasing;
+                english.x = 750;
+                add(english);
+
 		blackFade = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		add(blackFade);
 
@@ -106,8 +116,8 @@ class FlashingState extends MusicBeatState
 		grain.scale.x = 1.1;
 		grain.scale.y = 1.1;
 		add(grain);
-		
-		FlxTween.tween(blackFade, {alpha: 0}, 1); //duplicatin' code from Disclaimer since this is BEFORE picking your language now.
+
+		FlxTween.tween(blackFade, {alpha: 0}, 1); //we be makin this shit fancy now
 	}
 
 	function addShader(effect:ShaderEffect)
@@ -129,32 +139,43 @@ class FlashingState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
-		if(!leftState) {
-			var back:Bool = controls.BACK;
-			if (controls.ACCEPT || back) {
-				leftState = true;
-				FlxTransitionableState.skipNextTransIn = true;
-				FlxTransitionableState.skipNextTransOut = true;
-				if(!back) {
-					ClientPrefs.flashing = true;
-					ClientPrefs.saveSettings();
+		
+		if(!languageSelected) {
+				
+				if(FlxG.mouse.overlaps(spanish) && FlxG.mouse.justPressed) {
+					languageSelected = true;
+					FlxTransitionableState.skipNextTransIn = true;
+					FlxTransitionableState.skipNextTransOut = true;
+					ClientPrefs.language = "Spanish";
 					FlxG.sound.play(Paths.sound('funkinAVI/menu/select_sfx'));
-					FlxTween.tween(blackFade, {alpha: 1}, 1, {
+					ClientPrefs.saveSettings();
+					FlxTween.tween(otherText, {alpha: 0}, 1);
+					FlxTween.tween(english, {alpha: 0}, 0.2);
+					FlxTween.tween(warnText, {alpha: 0}, 1);
+					FlxTween.tween(spanish, {alpha: 0}, 1.7, {
 						onComplete: function (twn:FlxTween) {
-							MusicBeatState.switchState(new DisclaimerState());
+							MusicBeatState.switchState(new FlashingState());
 						}
 					});
 				} else {
-					ClientPrefs.flashing = false;
+				if(FlxG.mouse.overlaps(english) && FlxG.mouse.justPressed) {
+					languageSelected = true;
+					FlxTransitionableState.skipNextTransIn = true;
+					FlxTransitionableState.skipNextTransOut = true;
+					ClientPrefs.language = "English";
 					FlxG.sound.play(Paths.sound('funkinAVI/menu/select_sfx'));
-					FlxTween.tween(blackFade, {alpha: 1}, 1, {
+                   	ClientPrefs.saveSettings();
+					FlxTween.tween(otherText, {alpha: 0}, 1);
+					FlxTween.tween(spanish, {alpha: 0}, 0.2);
+					FlxTween.tween(warnText, {alpha: 0}, 1);
+					FlxTween.tween(english, {alpha: 0}, 1.7, {
 						onComplete: function (twn:FlxTween) {
-							MusicBeatState.switchState(new DisclaimerState());
+							MusicBeatState.switchState(new FlashingState());
 						}
 					});
 				}
 			}
-		}
 		super.update(elapsed);
 	}
+}
 }
